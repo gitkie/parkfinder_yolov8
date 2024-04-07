@@ -1,12 +1,64 @@
-# Function to process new images from a specific camera
-def process_new_images(camera_index):
-    # Get the list of image files in the directory for the specified camera
-    image_files = os.listdir(output_directories[camera_index])
+import cv2
+import pandas as pd
+import numpy as np
+from ultralytics import YOLO
+import time
+import mysql.connector
+import os
+
+# Initialize YOLO model
+model = YOLO("yolov8s.pt")
+
+# Connect to MySQL database
+conn = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    password="capstone2",
+    database="db_acas",
+)
+
+# Create a cursor object
+cursor = conn.cursor()
+
+# Directory where images are saved
+image_directory = "screenshots"
+
+# Define the file extension for images
+image_extension = ".jpg"
+
+# Read class names from coco.txt file
+with open("coco.txt", "r") as my_file:
+    data = my_file.read()
+    class_list = data.split("\n")
+
+# Fetch parking areas from the database in ascending order
+cursor.execute("SELECT area FROM carss ORDER BY CAST(SUBSTRING(area, 5) AS UNSIGNED)")
+rows = cursor.fetchall()
+areas = [row[0] for row in rows]
+
+# Define parking area polygons
+area_points_dict = {
+    "AREA1": [(249, 517), (401, 523), (429, 260), (283, 260)],
+    "AREA2": [(429, 521), (574, 526), (580, 258), (449, 261)],
+    "AREA3": [(605, 523), (754, 526), (741, 257), (603, 261)],
+    "AREA4": [(772, 527), (918, 520), (894, 264), (757, 260)],
+    "AREA5": [(947, 523), (1073, 513), (1032, 264), (915, 264)],
+}
+
+# Convert keys to uppercase
+area_points_dict = {key.upper(): value for key, value in area_points_dict.items()}
+
+# Function to process new images
+def process_new_images():
+    # Get the list of image files in the directory
+    image_files = os.listdir(image_directory)
+    
+    # Sort the list of image files
     image_files.sort()
 
     for image_file in image_files:
         # Read the image
-        image_path = os.path.join(output_directories[camera_index], image_file)
+        image_path = os.path.join(image_directory, image_file)
         frame = cv2.imread(image_path)
 
         # Perform object detection using YOLO model
@@ -121,16 +173,36 @@ def process_new_images(camera_index):
                 1,
             )
 
-        cv2.imshow(f"Camera {camera_index}", frame)
+        cv2.imshow("RGB", frame)
 
         if cv2.waitKey(1) & 0xFF == 27:
             break
 
-# Main loop to continuously process new images from each camera
+# RTSP stream URLs for multiple cameras
+rtsp_urls = [
+    "rtsp://username:password@192.168.1.1:554/stream1",
+    "rtsp://username:password@192.168.1.2:554/stream1",
+    # Add more RTSP stream URLs for additional cameras
+]
+
+# Output directories to save screenshots for each camera
+output_directories = [
+    "screenshots/cam1",
+    "screenshots/cam2",
+    # Add more output directories for additional cameras
+]
+
+# Create the output directories if they don't exist
+for directory in output_directories:
+    os.makedirs(directory, exist_ok=True)
+
+# Flags to track initial screenshots for each camera
+initial_screenshots_taken = [False] * len(rtsp_urls)
+
+# Main loop to continuously process new images
 while True:
-    for i, rtsp_url in enumerate(rtsp_urls):
-        process_new_images(i)
-        time.sleep(1)  # Adjust this value as needed
+    process_new_images()
+    time.sleep(1)  # Adjust this value as needed
 
 # Close MySQL connection
 cursor.close()
