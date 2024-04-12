@@ -3,27 +3,20 @@ import pandas as pd
 import numpy as np
 from ultralytics import YOLO
 import time
-import pyrebase  # Import Pyrebase for Firebase integration
+import firebase_admin
+from firebase_admin import credentials, db
 
 # Initialize YOLO model
 model = YOLO("yolov8s.pt")
 
-# Firebase configuration
-firebase_config = {
-    "apiKey": "YOUR_API_KEY",
-    "authDomain": "YOUR_AUTH_DOMAIN",
-    "databaseURL": "YOUR_DATABASE_URL",
-    "projectId": "YOUR_PROJECT_ID",
-    "storageBucket": "YOUR_STORAGE_BUCKET",
-    "messagingSenderId": "YOUR_MESSAGING_SENDER_ID",
-    "appId": "YOUR_APP_ID",
-}
-
-# Initialize Firebase app
-firebase = pyrebase.initialize_app(firebase_config)
+# Firebase credentials
+cred = credentials.Certificate("path/to/firebase_credentials.json")
+firebase_admin.initialize_app(cred, {
+    'databaseURL': 'YOUR_DATABASE_URL'
+})
 
 # Get a reference to the Firebase Realtime Database
-db = firebase.database()
+ref = db.reference('/')
 
 # Directory where images are saved
 image_directory = "screenshots"
@@ -112,7 +105,7 @@ def process_new_images():
                                     1,
                                 )
                                 # Insert car information into the Firebase Realtime Database
-                                db.child("carss").push({
+                                ref.child("carss").push({
                                     "area": area_name,
                                     "x": cx,
                                     "y": cy,
@@ -140,7 +133,7 @@ def process_new_images():
             )
             if car_count == 0:
                 # If no cars are detected, mark the parking area as vacant
-                db.child("carss").push({
+                ref.child("carss").push({
                     "area": area_name,
                     "x": None,
                     "y": None,
@@ -190,4 +183,3 @@ while True:
 # cursor.close()
 # conn.close()
 cv2.destroyAllWindows()
-
